@@ -9,11 +9,60 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @RestController
 @RequiredArgsConstructor
 public class MemberApiController {
 
     private final MemberService memberService;
+
+    /**
+     * 회원 조회 V1 : 응답 값으로 엔티티를 직접 외부에 노출한다.
+     * 문제점
+     *  - 엔티티에 프레젠테이션 계층(컨트롤러 단)을 위한 로직이 추가된다
+     *      - 기본적으로 엔티티의 모든 값들이 노출된다
+     *      - 응답 스펙을 맞추기 위한 로직이 추가된다(@JsonIgnor, 별도의 뷰 로직 등)
+     *      - 실무에서는 회원 엔티티를 위한 다양한 API가 필요한데,
+     *        한 엔티티에 API 각각을 위한 요청/요구사항을 담기는 어렵다
+     *  - 엔티티가 변경되면 API 스펙이 변해야 한다
+     *  - 추가로 컬렉션을 직접 반환하면 향후 API 스펙을 변경하기 어렵다
+     *    (별도의 Result 클래스 생성으로 해결)
+     * 결론
+     *  - API 응답 스펙에 맞춰 별도의 DTO를 반환한다
+     */
+    @GetMapping("/api/v1/members")
+    public List<Member> membersV1() {
+        return memberService.findMembers();
+    }
+
+    /**
+     * 회원 조회 V2 : 응답 값으로 엔티티가 아닌 별도의 DTO를 반환한다.
+     * 추가로 Result 클래스로 컬렉션을 감싸서 향후 필요한 필드를 추가할 수 있다.
+     */
+    @GetMapping("/api/v2/members")
+    public Result memberV2() {
+        List<Member> findMembers = memberService.findMembers();
+        List<MemberDto> collect = findMembers.stream()
+                .map(m -> new MemberDto(m.getName()))
+                .collect(Collectors.toList());
+
+        return new Result(collect.size(), collect);
+    }
+
+    @Data
+    @AllArgsConstructor
+    static class Result<T> {
+        private int count; // 필요한 필드를 자유롭게 추가 가능
+        private T data;
+    }
+
+    @Data
+    @AllArgsConstructor
+    static class MemberDto {
+        private String name;
+    }
 
     /**
      * 회원 등록 V1 : 요청 값을 Member 엔티티로 받는다.
